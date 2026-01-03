@@ -24,19 +24,21 @@ def home():
             <h2>🌱 AgriVision</h2>
             <p>Rasm yuklang</p>
 
-            <form action="/upload" method="post" enctype="multipart/form-data">
-              <input 
-  type="file" 
-  name="file" 
-  accept="image/*" 
-  capture 
-  required
->
+           <form action="/upload" method="post" enctype="multipart/form-data">
 
+  <label style="display:block; margin:10px;">
+    📸 Kameradan olish
+    <input type="file" name="file" accept="image/*" capture="environment" hidden>
+  </label>
 
-                <br><br>
-                <button type="submit">📷 Rasmni yuklash</button>
-            </form>
+  <label style="display:block; margin:10px;">
+    🖼️ Galareyadan tanlash
+    <input type="file" name="file" accept="image/*" hidden>
+  </label>
+
+  <button type="submit">Yuborish</button>
+</form>
+
         </div>
     </body>
     </html>
@@ -56,5 +58,6 @@ async def upload(file: UploadFile = File(...)):
     <p>O‘lchami: {w} x {h}</p>
     <a href="/">⬅ Yana rasm yuklash</a>
     """
+
 
 
