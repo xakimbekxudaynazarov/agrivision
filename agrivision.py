@@ -70,85 +70,73 @@ def home():
     """
 
 
+from typing import Optional
+
 @app.post("/upload", response_class=HTMLResponse)
 async def upload(
     camera_file: Optional[UploadFile] = File(None),
     gallery_file: Optional[UploadFile] = File(None)
 ):
-    file = camera_file or gallery_file
-    if not file:
-        return "<h3>❌ Rasm tanlanmadi</h3><a href='/'>⬅ Orqaga</a>"
+    try:
+        file = camera_file or gallery_file
+        if not file:
+            return "<h3>❌ Rasm tanlanmadi</h3><a href='/'>⬅ Orqaga</a>"
 
-    data = await file.read()
-    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
-    if img is None:
-        return "<h3>❌ Rasm o‘qilmadi</h3><a href='/'>⬅ Orqaga</a>"
+        data = await file.read()
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        # Juda katta rasmni cheklash (5MB)
+        if len(data) > 5 * 1024 * 1024:
+            return "<h3>❌ Rasm juda katta (5MB dan kichik yuklang)</h3><a href='/'>⬅ Orqaga</a>"
 
-    h, w, _ = img.shape
-    total = h * w
+        img_array = np.frombuffer(data, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
 
-    # 1. Qora dog‘lar
-    dark_ratio = np.sum(gray < 80) / total
+        if img is None:
+            return "<h3>❌ Rasm o‘qilmadi</h3><a href='/'>⬅ Orqaga</a>"
 
-    # 2. Sariqlik
-    yellow_mask = cv2.inRange(hsv, (20, 80, 80), (35, 255, 255))
-    yellow_ratio = np.sum(yellow_mask > 0) / total
+        # Rasmni kichraytiramiz (Render uchun muhim)
+        img = cv2.resize(img, (300, 300))
 
-    # 3. Oqartgan joylar
-    white_ratio = np.sum(gray > 220) / total
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    # 4. Jigarrang dog‘lar
-    brown_mask = cv2.inRange(hsv, (10, 50, 50), (20, 200, 200))
-    brown_ratio = np.sum(brown_mask > 0) / total
+        total = gray.size
 
-    # 5. Rang notekisligi
-    std_dev = np.std(gray)
+        dark_ratio = np.sum(gray < 80) / total
+        yellow_mask = cv2.inRange(hsv, (20, 80, 80), (35, 255, 255))
+        yellow_ratio = np.sum(yellow_mask > 0) / total
+        white_ratio = np.sum(gray > 220) / total
+        std_dev = np.std(gray)
 
-    # 6. Juda qoramtir
-    mean_light = np.mean(gray)
+        findings = []
 
-    # 7. Mayda nuqtalar (noise)
-    edges = cv2.Canny(gray, 50, 150)
-    edge_ratio = np.sum(edges > 0) / total
+        if dark_ratio > 0.18:
+            findings.append("⚫ Qora dog‘lar (zamburug‘ ehtimoli)")
+        if yellow_ratio > 0.25:
+            findings.append("🟡 Sariqlik (oziqa yetishmasligi)")
+        if white_ratio > 0.12:
+            findings.append("⚪ Oqartgan joylar")
+        if std_dev > 55:
+            findings.append("🌈 Rang notekisligi")
 
-    findings = []
+        if not findings:
+            result = "🌿 Barg sog‘lom ko‘rinadi"
+            advice = "Parvarishni davom ettiring"
+        else:
+            result = "⚠️ Kasallik belgilari aniqlandi"
+            advice = "<br>".join(findings)
 
-    if dark_ratio > 0.18:
-        findings.append("⚫ Qora dog‘lar (zamburug‘)")
+        return f"""
+        <div style="font-family:Arial; text-align:center;">
+            <h2>{result}</h2>
+            <p>{advice}</p>
+            <a href="/">⬅ Yana rasm yuklash</a>
+        </div>
+        """
 
-    if yellow_ratio > 0.25:
-        findings.append("🟡 Sariqlik (oziqa yetishmasligi)")
-
-    if white_ratio > 0.12:
-        findings.append("⚪ Oqartgan joylar")
-
-    if brown_ratio > 0.10:
-        findings.append("🟤 Jigarrang dog‘lar (kuyish)")
-
-    if std_dev > 55:
-        findings.append("🌈 Rang notekisligi")
-
-    if mean_light < 90:
-        findings.append("⚠️ Juda qoramtir (chiriyotgan bo‘lishi mumkin)")
-
-    if edge_ratio > 0.15:
-        findings.append("🐛 Mayda nuqtalar (hasharot ehtimoli)")
-
-    if not findings:
-        result = "🌿 Barg sog‘lom ko‘rinadi"
-        advice = "Parvarishni davom ettiring"
-    else:
-        result = "⚠️ Kasallik belgilari aniqlandi"
-        advice = "<br>".join(findings)
-
-    return f"""
-    <div style="font-family:Arial; text-align:center;">
-        <h2>{result}</h2>
-        <p>{advice}</p>
-        <p>Rasm o‘lchami: {w} x {h}</p>
-        <a href="/">⬅ Yana rasm yuklash</a>
-    </div>
-    """
+    except Exception as e:
+        return f"""
+        <h3>❌ Server xatosi</h3>
+        <pre>{str(e)}</pre>
+        <a href="/">⬅ Orqaga</a>
+        """
