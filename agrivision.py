@@ -66,11 +66,20 @@ async def upload(
 
         data = await file.read()
 
+        # 🛑 BO‘SH FILE HIMOYASI (ASOSIY YECHIM)
+        if not data or len(data) < 100:
+            return "<h3>❌ Fayl bo‘sh yoki yaroqsiz</h3><a href='/'>⬅ Orqaga</a>"
+
         if len(data) > 5 * 1024 * 1024:
             return "<h3>❌ Rasm juda katta (5MB dan kichik)</h3><a href='/'>⬅ Orqaga</a>"
 
-        # 🔑 PIL orqali o‘qiymiz (format muammosiz)
-        pil_img = Image.open(io.BytesIO(data)).convert("RGB")
+        # ✅ PIL orqali ishonchli o‘qish
+        try:
+            pil_img = Image.open(io.BytesIO(data))
+            pil_img.verify()  # formatni tekshiradi
+            pil_img = Image.open(io.BytesIO(data)).convert("RGB")
+        except Exception:
+            return "<h3>❌ Rasm formati qo‘llab-quvvatlanmaydi</h3><a href='/'>⬅ Orqaga</a>"
 
         # OpenCV formatiga o‘tkazamiz
         img = np.array(pil_img)
@@ -94,11 +103,10 @@ async def upload(
         std_dev = np.std(gray)
 
         findings = []
-
         if dark_ratio > 0.18:
-            findings.append("⚫ Qora dog‘lar (zamburug‘)")
+            findings.append("⚫ Qora dog‘lar")
         if yellow_ratio > 0.25:
-            findings.append("🟡 Sariqlik (oziqa yetishmasligi)")
+            findings.append("🟡 Sariqlik")
         if white_ratio > 0.12:
             findings.append("⚪ Oqartgan joylar")
         if std_dev > 55:
