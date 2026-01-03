@@ -25,7 +25,14 @@ def home():
             <p>Rasm yuklang</p>
 
             <form action="/upload" method="post" enctype="multipart/form-data">
-                <input type="file" name="file" accept="image/*" capture="environment" required>
+                <input 
+  type="file" 
+  name="file" 
+  accept="image/*" 
+  capture="camera"
+  required
+>
+
                 <br><br>
                 <button type="submit">📷 Rasmni yuklash</button>
             </form>
@@ -48,3 +55,4 @@ async def upload(file: UploadFile = File(...)):
     <p>O‘lchami: {w} x {h}</p>
     <a href="/">⬅ Yana rasm yuklash</a>
     """
+
