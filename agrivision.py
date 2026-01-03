@@ -13,16 +13,23 @@ def home():
     <head>
         <title>AgriVision</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body { font-family: Arial; text-align: center; background:#f4f6f7; }
+            .box { background:white; padding:20px; margin:40px auto; max-width:400px; border-radius:10px; }
+            button { padding:10px 20px; font-size:16px; }
+        </style>
     </head>
-    <body style="font-family:Arial;text-align:center">
-        <h1>🌱 AgriVision ishlayapti</h1>
-        <p>Internet orqali ochildi</p>
+    <body>
+        <div class="box">
+            <h2>🌱 AgriVision</h2>
+            <p>Rasm yuklang</p>
 
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept="image/*" required>
-            <br><br>
-            <button type="submit">📷 Rasm yuklash</button>
-        </form>
+            <form action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept="image/*" capture="environment" required>
+                <br><br>
+                <button type="submit">📷 Rasmni yuklash</button>
+            </form>
+        </div>
     </body>
     </html>
     """
@@ -36,4 +43,8 @@ async def upload(file: UploadFile = File(...)):
         return "<h3>❌ Rasm o‘qilmadi</h3><a href='/'>⬅ Orqaga</a>"
 
     h, w, _ = img.shape
-    return f"<h3>✅ Rasm qabul qilindi: {w} x {h}</h3><a href='/'>⬅ Yana yuklash</a>"
+    return f"""
+    <h2>✅ Rasm qabul qilindi</h2>
+    <p>O‘lchami: {w} x {h}</p>
+    <a href="/">⬅ Yana rasm yuklash</a>
+    """
