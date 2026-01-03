@@ -51,6 +51,9 @@ def home():
     """
 
 
+from PIL import Image
+import io
+
 @app.post("/upload", response_class=HTMLResponse)
 async def upload(
     camera_file: Optional[UploadFile] = File(None),
@@ -63,23 +66,22 @@ async def upload(
 
         data = await file.read()
 
-        # 5MB limit
         if len(data) > 5 * 1024 * 1024:
             return "<h3>❌ Rasm juda katta (5MB dan kichik)</h3><a href='/'>⬅ Orqaga</a>"
 
-        img_array = np.frombuffer(data, np.uint8)
-        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        # 🔑 PIL orqali o‘qiymiz (format muammosiz)
+        pil_img = Image.open(io.BytesIO(data)).convert("RGB")
 
-        if img is None or img.size == 0:
-            return "<h3>❌ Rasm o‘qilmadi</h3><a href='/'>⬅ Orqaga</a>"
+        # OpenCV formatiga o‘tkazamiz
+        img = np.array(pil_img)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-        # 🔒 SAFE RESIZE (faqat katta bo‘lsa)
+        # Safe resize
         h, w, _ = img.shape
         if max(h, w) > 400:
             scale = 400 / max(h, w)
-            img = cv2.resize(img, (int(w*scale), int(h*scale)))
+            img = cv2.resize(img, (int(w * scale), int(h * scale)))
 
-        # 🔒 SAFE COLOR CONVERT
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
