@@ -3,6 +3,8 @@ from fastapi.responses import HTMLResponse
 from typing import Optional
 import cv2
 import numpy as np
+import base64
+
 
 app = FastAPI()
 
@@ -59,77 +61,51 @@ async def upload(
     camera_file: Optional[UploadFile] = File(None),
     gallery_file: Optional[UploadFile] = File(None)
 ):
-    try:
-        file = camera_file or gallery_file
-        if not file:
-            return "<h3>❌ Rasm tanlanmadi</h3><a href='/'>⬅ Orqaga</a>"
+    file = camera_file or gallery_file
+    if not file:
+        return "<h3>❌ Rasm tanlanmadi</h3><a href='/'>⬅ Orqaga</a>"
 
-        data = await file.read()
+    data = await file.read()
 
-        # 🛑 BO‘SH FILE HIMOYASI (ASOSIY YECHIM)
-        if not data or len(data) < 100:
-            return "<h3>❌ Fayl bo‘sh yoki yaroqsiz</h3><a href='/'>⬅ Orqaga</a>"
+    if not data:
+        return "<h3>❌ Fayl bo‘sh</h3><a href='/'>⬅ Orqaga</a>"
 
-        if len(data) > 5 * 1024 * 1024:
-            return "<h3>❌ Rasm juda katta (5MB dan kichik)</h3><a href='/'>⬅ Orqaga</a>"
+    # 📷 RASMNI BASE64 GA O‘TKAZAMIZ
+    img_base64 = base64.b64encode(data).decode("utf-8")
 
-        # ✅ PIL orqali ishonchli o‘qish
-        try:
-            pil_img = Image.open(io.BytesIO(data))
-            pil_img.verify()  # formatni tekshiradi
-            pil_img = Image.open(io.BytesIO(data)).convert("RGB")
-        except Exception:
-            return "<h3>❌ Rasm formati qo‘llab-quvvatlanmaydi</h3><a href='/'>⬅ Orqaga</a>"
+    # OpenCV orqali o‘qiymiz (kamera JPEG)
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        return "<h3>❌ Rasm o‘qilmadi</h3><a href='/'>⬅ Orqaga</a>"
 
-        # OpenCV formatiga o‘tkazamiz
-        img = np.array(pil_img)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    # Kichraytiramiz
+    img = cv2.resize(img, (300, 300))
 
-        # Safe resize
-        h, w, _ = img.shape
-        if max(h, w) > 400:
-            scale = 400 / max(h, w)
-            img = cv2.resize(img, (int(w * scale), int(h * scale)))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    total = gray.size
+    dark_ratio = np.sum(gray < 80) / total
 
-        total = gray.size
+    # 📊 FOIZ HISOBI
+    disease_percent = min(int(dark_ratio * 300), 100)
+    healthy_percent = 100 - disease_percent
 
-        dark_ratio = np.sum(gray < 80) / total
-        yellow_mask = cv2.inRange(hsv, (20, 80, 80), (35, 255, 255))
-        yellow_ratio = np.sum(yellow_mask > 0) / total
-        white_ratio = np.sum(gray > 220) / total
-        std_dev = np.std(gray)
+    if disease_percent > 30:
+        result = "⚠️ Kasallik ehtimoli yuqori"
+    else:
+        result = "🌿 Barg sog‘lom ko‘rinadi"
 
-        findings = []
-        if dark_ratio > 0.18:
-            findings.append("⚫ Qora dog‘lar")
-        if yellow_ratio > 0.25:
-            findings.append("🟡 Sariqlik")
-        if white_ratio > 0.12:
-            findings.append("⚪ Oqartgan joylar")
-        if std_dev > 55:
-            findings.append("🌈 Rang notekisligi")
+    return f"""
+    <div style="font-family:Arial; text-align:center;">
+        <h2>{result}</h2>
 
-        if not findings:
-            result = "🌿 Barg sog‘lom"
-            advice = "Parvarishni davom ettiring"
-        else:
-            result = "⚠️ Kasallik belgilari topildi"
-            advice = "<br>".join(findings)
+        <img src="data:image/jpeg;base64,{img_base64}"
+             style="max-width:300px;border-radius:10px;margin:15px 0;"/>
 
-        return f"""
-        <div style="font-family:Arial; text-align:center;">
-            <h2>{result}</h2>
-            <p>{advice}</p>
-            <a href="/">⬅ Yana rasm yuklash</a>
-        </div>
-        """
+        <p>⚠️ Kasallik ehtimoli: <b>{disease_percent}%</b></p>
+        <p>🌿 Sog‘lom ehtimoli: <b>{healthy_percent}%</b></p>
 
-    except Exception as e:
-        return f"""
-        <h3>❌ Server xatosi</h3>
-        <pre>{str(e)}</pre>
-        <a href="/">⬅ Orqaga</a>
-        """
+        <a href="/">⬅ Yana rasm yuklash</a>
+    </div>
+    """
+
